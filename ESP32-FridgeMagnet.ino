@@ -1,34 +1,31 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <WiFi.h>
-#include <WiFiMulti.h>
+//#include <WiFiMulti.h>
 #include <WiFiUdp.h>
 #include <HTTPClient.h>
 #include <Wire.h>
 #include "SSD1306.h"
 #include "wifi.h"
 #include "time.h"
-#include "din1451_18.h"
-#include "din1451_40.h"
+#include "din1451_16.h"
+#include "din1451_36.h"
+     
+      // CONFIG
+      static const char ssid[20] = "YOUR SSID HERE"; 
+      static const char pass[20] = "PASSWORD HERE";
+      String API_KEY = "b8b8cdd41a9b624ad13b6496b7bb2de7";
+      String LOCATION = "Bucharest,RO";
+      String API_CALL = "http://api.openweathermap.org/data/2.5/weather";
+      String UNITS = "metric";
+      const int TIMEOUT = 20; // seconds to shutdown
       
-      // WIFI CONFIG
-      static const char ssid[20] = "<SSID>";
-      static const char pass[20] = "<PASSWORD>";
+      const char* ntpServer = "pool.ntp.org";
+      const long  gmtOffset_sec = 7200;
+      const int   daylightOffset_sec = 3600;
 
-      // WEATHER CONFIG
-      String API_KEY = "OPEN_WEATHER_MAP_API_KEY";
-      String LOCATION = "CITY,COUNTRY_CODE";
-      String UNITS = "metric"; // imperial
-      
-      // INTERNET TIME CONFIG
-      const long  gmtOffset_sec = 0; // 7200;
-      const int   daylightOffset_sec = 0; // 3600;
-
-String WD[8] = {"-", "Mon", "Tue", "Wes", "Thu", "Fri", "Sat", "Sun"};
-String API_CALL = "http://api.openweathermap.org/data/2.5/weather";
+String WD[8] = {"-", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"};
 char deg[3] = { 0xC2, 0xB0, 0x00 };
-const char* ntpServer = "pool.ntp.org";
-
 #define BUFFER_SIZE (4000)
 #define NUMITEMS(arg) ((unsigned int) (sizeof (arg) / sizeof (arg [0])))
 
@@ -36,8 +33,8 @@ const char* ntpServer = "pool.ntp.org";
 #define WiFi_Logo_height 36
 
 int x = 0;
-WiFiMulti wifiMulti;
 SSD1306  display(0x3c, 5, 4);
+HTTPClient http;
 
 const char WiFi_Logo_bits[] PROGMEM = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF8,
@@ -73,47 +70,58 @@ String GetURL(void) {
 }
 
 void showProgress(void) {
-  x++;
-  display.clear();
-  display.drawXbm(34, 8, WiFi_Logo_width, WiFi_Logo_height, WiFi_Logo_bits);
-  //display.drawRect(1, 56, 127, 8);
-  display.fillRect(x * 5, 56, x * 5 + 5, 8);
-  display.display();
+    display.clear();
+    display.setTextAlignment(TEXT_ALIGN_CENTER);
+    display.setFont(ArialMT_Plain_10);
+    display.drawXbm(34, 16, WiFi_Logo_width, WiFi_Logo_height, WiFi_Logo_bits);
+    display.drawString(64, 0, "Weather in " + LOCATION);
+    display.fillRect(x * 4 - 5, 60, x + 10, 4);
+    display.display();
+    x++;
 }
 
 void setup() {
     display.init();
     showProgress();
-    delay(100);
+    delay(200);
     Serial.begin(115200);
-    wifiMulti.addAP(ssid, pass);
+    //wifiMulti.addAP(ssid, pass);
+    WiFi.begin(ssid, pass);
     showProgress();
-    delay(100);
+    delay(200);
     
-    while((wifiMulti.run() != WL_CONNECTED)) {
+    //while((wifiMulti.run() != WL_CONNECTED)) {
+    while (WiFi.status() != WL_CONNECTED) {
         Serial.print(".");
         showProgress();
+        delay(200);
     }
-
+    Serial.println("\r\nconnected");
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
     showProgress();
-    delay(100);
+    Serial.println("NTP OK");
 }
 
 void loop() {
+    int shown = 0;
+    
     // wait for WiFi connection
-    if((wifiMulti.run() == WL_CONNECTED)) {
-
-        HTTPClient http;
+    //if((wifiMulti.run() == WL_CONNECTED)) {
+    if (WiFi.status() == WL_CONNECTED) {
+        
         http.begin(GetURL()); //HTTP
-
+        Serial.println("HTTP connected");
+        showProgress();
+        
         // start connection and send HTTP header
         int httpCode = http.GET();
-
+        Serial.println("HTTP content loaded");
+        showProgress();
+        
         // httpCode will be negative on error
         if(httpCode > 0) {
             // HTTP header has been send and Server response header has been handled
-            //Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+            Serial.printf("[HTTP] GET... code: %d\n", httpCode);
 
             // file found at server
             if(httpCode == HTTP_CODE_OK) {
@@ -147,7 +155,7 @@ void loop() {
                 
                 struct tm timeinfo;
 
-                while(1) {
+                for(shown = 0; shown < TIMEOUT; shown++) {
                     if(getLocalTime(&timeinfo)) {
                         sprintf(line2, " %04d-%02d-%02d", 1900 + timeinfo.tm_year, timeinfo.tm_mon + 1, timeinfo.tm_mday);
                         sprintf(line3, "%02d:%02d:%02d", timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
@@ -160,29 +168,31 @@ void loop() {
                     display.clear();
                     display.setTextAlignment(TEXT_ALIGN_CENTER);
                     
-                    display.setFont(DIN_18);
+                    display.setFont(DIN_16);
                     display.drawString(64, 0, line1);
     
-                    display.setFont(DIN_40);
+                    display.setFont(DIN_36);
                     display.drawString(64, 13, line3);
                     
                     display.setFont(ArialMT_Plain_10);
-                    display.drawString(64, 52, LOCATION + ", " + WD[timeinfo.tm_wday] + line2);
-    
+                    display.drawString(64, 52, WD[timeinfo.tm_wday] + ", " + line2);
                     display.display();
                     
                     delay(1000);
                 }
+                display.clear();
+                display.display();
+                
+                http.end();
+                WiFi.disconnect(true);
+                WiFi.mode(WIFI_OFF);
+                
+                esp_deep_sleep_start();
+                
+                delay(600 * 1000);
             }
         } else {
             Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
-        }
-
-        http.end();
+        }   
     }
-    
-    WiFi.disconnect(true);
-    WiFi.mode(WIFI_OFF);
-    
-    delay(600 * 1000);
 }
