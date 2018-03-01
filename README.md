@@ -1,14 +1,14 @@
 # ESP32_FridgeMagnet
-ESP32-based, WEMOS LOLIN32-compatible, fridge magnet
+
 Video here: https://www.youtube.com/watch?v=0v66mTCL1lw
 
 **HARDWARE REQUIREMENTS**
 
-- ESP32 Board with integrated SSD1306 OLED 
+- WEMOS LOLIN32-compatible Board with integrated SSD1306 OLED 
 
 **OR**
 
-- ESP32 Board
+- Generic ESP32 Board
 - SSD1306 I2C OLED
 
 **SOFTWARE REQUIREMENTS**
