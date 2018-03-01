@@ -1,6 +1,6 @@
 # ESP32_FridgeMagnet
 ESP32-based, WEMOS LOLIN32-compatible, fridge magnet
-
+Video here: https://www.youtube.com/watch?v=0v66mTCL1lw
 
 **HARDWARE REQUIREMENTS**
 
